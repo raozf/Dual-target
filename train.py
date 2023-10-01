@@ -212,7 +212,7 @@ def main():
                              num_workers=args.num_workers)
 
     model = DTROPNet(args)
-    model.load_state_dict(torch.load(args.checkpoint))
+#    model.load_state_dict(torch.load(args.checkpoint))                #Whether to use a pre-trained model
     model = model.cuda()
     loss_fn = cal_loss
     optimizer = torch.optim.Adam(model.parameters(), lr=args.lr)
@@ -240,7 +240,7 @@ def main():
     for epoch in range(epoch, args.epoches):
         for param_group in optimizer.param_groups:
             current_lr = param_group['lr']
-            print("当前学习率：", current_lr)
+            print("learning rate", current_lr)
         print('=' * 20, epoch + 1, '=' * 20)
         train_results = train_one_epoch(train_loader=train_loader,
                                         model=model,
@@ -258,10 +258,11 @@ def main():
                                       log_freq=args.log_freq,
                                       writer=writer)
             print_train_info(test_results)
-            saved_path = os.path.join(checkpoints_path, "1240test_min_loss.pth")
+            saved_path = os.path.join(checkpoints_path, "test_min_loss.pth")
             torch.save(model.state_dict(), saved_path)
         scheduler.step()   
-'''        if epoch<=5 or epoch >= 1000:
+#If you use a validation set, you can choose the best model based on the validation set results, and the best model will not appear in the first 1000 epochs
+'''        if epoch >= 1000:
             test_results = test_one_epoch(test_loader=val_loader,
                                           model=model,
                                           loss_fn=loss_fn,

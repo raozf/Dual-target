@@ -52,8 +52,10 @@ class ModelNet40(Dataset):
         
         files = [os.path.join(root, 'ply_data_train{}.h5'.format(i))
                  for i in range(5)]
+#         files = [os.path.join(root, 'ply_data_train{}.h5'.format(i))
+#                 for i in range(4)]
 #        if self.split == 'val':
-#            files = [os.path.join(root, 'ply_data_train{}.h5'.format(4))]
+#            files = [os.path.join(root, 'ply_data_train{}.h5'.format(4))]     #Whether to use a validation set
         if self.split == 'test':
             files = [os.path.join(root, 'ply_data_test{}.h5'.format(i))
                      for i in range(2)]
@@ -78,12 +80,12 @@ class ModelNet40(Dataset):
             cur_points = f['data'][:].astype(np.float32)
             cur_normal = f['normal'][:].astype(np.float32)
             cur_label = f['label'][:].flatten().astype(np.int32)
-            if self.unseen:
-                idx = np.isin(cur_label, self.half_labels)
+            if self.unseen:             #if unseen, The training set uses the first 20 categories, and the test set uses the last 18 categories
+                idx = np.isin(cur_label, self.half_labels)            
                 cur_points = cur_points[idx]
                 cur_normal = cur_normal[idx]
                 cur_label = cur_label[idx]
-            if self.ao and self.split in ['val', 'test']:
+            if self.ao and self.split in ['val', 'test']:   #Removes the symmetric class of a validation set or test set
                 idx = ~np.isin(cur_label, self.symmetric_labels)
                 cur_points = cur_points[idx]
                 cur_normal = cur_normal[idx]
@@ -104,10 +106,12 @@ class ModelNet40(Dataset):
 
     def compose(self, item, p_keep):
         tgt_cloud = self.data[item, ...]
-        keep0 = np.random.uniform(0.50, 0.60)
-        keep1 = np.random.uniform(0.50, 0.60)
-#        keep0 = 0.55
-#        keep1 = 0.55
+        keep0 = np.random.uniform(0.65, 0.75)                #random-parameter, just using in the testing process
+        keep1 = np.random.uniform(0.65, 0.75)
+        keep0 = 0.70
+        keep1 = 0.70
+        src_size = math.ceil(self.npts * keep0)              #the percentage of points retained in the source and target point cloud
+        tgt_size = math.ceil(self.npts * keep1)
         if self.split != 'train':
             np.random.seed(item)
             R, t = generate_random_rotation_matrix(), generate_random_tranlation_vector()
@@ -115,15 +119,9 @@ class ModelNet40(Dataset):
             tgt_cloud = flip_pc(tgt_cloud)
             R, t = generate_random_rotation_matrix(), generate_random_tranlation_vector()
 
-        src_cloud = random_crop(copy.deepcopy(tgt_cloud), p_keep=keep0)
-#        src_cloud = copy.deepcopy(tgt_cloud)
-#        tgt_cloud = copy.deepcopy(tgt_cloud)
-        src_size = math.ceil(self.npts * keep0)
-        tgt_size = self.npts
-        if len(p_keep) > 1:
-            tgt_cloud = random_crop(copy.deepcopy(tgt_cloud),
-                                    p_keep= keep1)
-            tgt_size = math.ceil(self.npts * keep1)
+        src_cloud = random_crop(copy.deepcopy(tgt_cloud), p_keep=keep0)  
+        tgt_cloud = random_crop(copy.deepcopy(tgt_cloud),p_keep= keep1)
+    
 
         src_cloud_points = transform(src_cloud[:, :3], R, t)
         src_cloud_normal = transform(src_cloud[:, 3:], R)
@@ -136,17 +134,14 @@ class ModelNet40(Dataset):
         src_cloud_R_points = transform(src_cloud[:, :3], np.linalg.inv(R))
         src_cloud_R_normal = transform(src_cloud[:, 3:], np.linalg.inv(R))
         src_cloud_R = np.concatenate([src_cloud_R_points, src_cloud_R_normal],
-                                   axis=-1)
-      
-#        print(src_cloud,src_cloud_R)
-        
+                                   axis=-1)                                    #The access to newly added target point cloud
+       
         if self.split == 'train' or self.noise:
             src_cloud[:, :3] = jitter_point_cloud(src_cloud[:, :3])
             src_cloud_R[:, :3] = jitter_point_cloud(src_cloud_R[:, :3])
             tgt_cloud[:, :3] = jitter_point_cloud(tgt_cloud[:, :3])
         tgt_cloud, src_cloud,src_cloud_R = shuffle_pc(tgt_cloud), shuffle_pc(
             src_cloud),shuffle_pc(src_cloud_R)
-#        print(src_cloud.shape,src_cloud_R.shape,tgt_cloud.shape)
         return src_cloud, src_cloud_R, tgt_cloud, R, t
 
     def __getitem__(self, item):
@@ -158,21 +153,11 @@ class ModelNet40(Dataset):
         x_size = src_cloud.shape[0]
         y_size = tgt_cloud.shape[0]
         if x_size < y_size:
-            diff = y_size - x_size  # 计算维度差
+            diff = y_size - x_size  
             src_cloud = np.concatenate((src_cloud , src_cloud[x_size-1-diff:x_size-1,:]), axis=0)
-#            print(src_cloud.shape)
         if x_size > y_size:    
-            diff = x_size - y_size  # 计算维度差
+            diff = x_size - y_size  
             tgt_cloud = np.concatenate((tgt_cloud , tgt_cloud[y_size-1-diff:y_size-1,:]), axis=0) 
-#            print(tgt_cloud.shape)
-#        if x_size < 717:
-#           src_cloud = np.concatenate((src_cloud , src_cloud[2*x_size-717:x_size,:]),axis=0)
-#        if y_size <717:
-#           tgt_cloud = np.concatenate((tgt_cloud , tgt_cloud[2*y_size-717:y_size,:]),axis=0)
-#        if x_size > 717:
-#            src_cloud = src_cloud[:717,:]
-#        if y_size > 717:
-#            tgt_cloud = tgt_cloud[:717,:]
         return tgt_cloud, src_cloud, src_cloud_R,  R, t
     def __len__(self):
         return len(self.data)

@@ -1,4 +1,4 @@
-
+#including the initialization module and the transformer-based overlapping-score prediction module
 import numpy as np
 import open3d as o3d
 import os
@@ -23,6 +23,56 @@ def attention(query, key, value, mask=None, dropout=None):
         scores = scores.masked_fill(mask == 0, -1e9)
     p_attn = F.softmax(scores, dim=-1)
     return torch.matmul(p_attn, value), p_attn
+
+
+class PointNet(nn.Module):                          #No residuals are used in the initialization module
+    def __init__(self, in_dim, gn, out_dims):
+        super(PointNet, self).__init__()
+        self.backbone = nn.Sequential()
+        for i, out_dim in enumerate(out_dims):
+            self.backbone.add_module(f'pointnet_conv_{i}',
+                                     nn.Conv1d(in_dim, out_dim, 1, 1, 0)) 
+            if gn:
+                self.backbone.add_module(f'pointnet_gn_{i}',
+                                         nn.GroupNorm(8, out_dim))
+            self.backbone.add_module(f'pointnet_relu_{i}',
+                                    nn.ReLU(inplace=True))
+            in_dim = out_dim
+
+    def forward(self, x, pooling=True):
+        f = self.backbone(x)
+        if not pooling:
+            return f
+        g, _ = torch.max(f, dim=2)
+        return f, g
+    
+class Res_PointNet(nn.Module):
+    def __init__(self, in_dim,gn):
+        super(Res_PointNet , self).__init__()
+        if gn:
+            self.conv_block1 = nn.Sequential(nn.Conv1d(in_dim, 64, 1,1,0),  nn.GroupNorm(8, 64), nn.ReLU(inplace=True))
+            self.conv_block2 = nn.Sequential(nn.Conv1d(64, 64, 1,1,0),  nn.GroupNorm(8, 64), nn.ReLU(inplace=True))
+            self.conv_block3 = nn.Sequential(nn.Conv1d(64, 64, 1,1,0),  nn.GroupNorm(8, 64), nn.ReLU(inplace=True))
+            self.conv_block4 = nn.Sequential(nn.Conv1d(64, 256, 1,1,0),  nn.GroupNorm(8, 256), nn.ReLU(inplace=True))
+            self.conv_block5 = nn.Sequential(nn.Conv1d(256, 1024, 1,1,0),  nn.GroupNorm(8, 1024), nn.ReLU(inplace=True))
+        else:
+            self.conv_block1 = nn.Sequential(nn.Conv1d(in_dim, 64, 1,1,0),  nn.BatchNorm1d(64), nn.ReLU(inplace=True))
+            self.conv_block2 = nn.Sequential(nn.Conv1d(64, 64, 1,1,0),  nn.BatchNorm1d(64), nn.ReLU(inplace=True))
+            self.conv_block3 = nn.Sequential(nn.Conv1d(64, 64, 1,1,0),  nn.BatchNorm1d(64), nn.ReLU(inplace=True))
+            self.conv_block4 = nn.Sequential(nn.Conv1d(64, 256, 1,1,0),  nn.BatchNorm1d(256), nn.ReLU(inplace=True))
+            self.conv_block5 = nn.Sequential(nn.Conv1d(256, 1024, 1,1,0),  nn.BatchNorm1d(1024), nn.ReLU(inplace=True))
+    def forward(self, x, pooling=True):
+        point1_feat64 = self.conv_block1(x)
+        point2_feat64 = self.conv_block2(point1_feat64)
+        point3_feat64 = self.conv_block3(point2_feat64)
+        x = self.conv_block4(point3_feat64)
+        point_feat1024 = self.conv_block5(x)
+        L = torch.cat([point1_feat64,point2_feat64,point3_feat64,point_feat1024], dim = 1)
+        if not pooling:
+            return L
+        x, _ = torch.max(L, dim=2)
+        return L , x
+
 
 class LayerNorm(nn.Module):
     def __init__(self, features, eps=1e-6):
@@ -191,63 +241,7 @@ class Transformer(nn.Module):
         src_embedding = self.model(tgt, src, None, None).transpose(2, 1).contiguous()
         return src_embedding, tgt_embedding
 
-
-
-
-
-
-
-
-class PointNet(nn.Module):
-    def __init__(self, in_dim, gn, out_dims):
-        super(PointNet, self).__init__()
-        self.backbone = nn.Sequential()
-        for i, out_dim in enumerate(out_dims):
-            self.backbone.add_module(f'pointnet_conv_{i}',
-                                     nn.Conv1d(in_dim, out_dim, 1, 1, 0)) 
-            if gn:
-                self.backbone.add_module(f'pointnet_gn_{i}',
-                                         nn.GroupNorm(8, out_dim))
-            self.backbone.add_module(f'pointnet_relu_{i}',
-                                    nn.ReLU(inplace=True))
-            in_dim = out_dim
-
-    def forward(self, x, pooling=True):
-        f = self.backbone(x)
-        if not pooling:
-            return f
-        g, _ = torch.max(f, dim=2)
-        return f, g
-    
-class PointNet1(nn.Module):
-    def __init__(self, in_dim,gn):
-        super(PointNet1 , self).__init__()
-        if gn:
-            self.conv_block1 = nn.Sequential(nn.Conv1d(in_dim, 64, 1,1,0),  nn.GroupNorm(8, 64), nn.ReLU(inplace=True))
-            self.conv_block2 = nn.Sequential(nn.Conv1d(64, 64, 1,1,0),  nn.GroupNorm(8, 64), nn.ReLU(inplace=True))
-            self.conv_block3 = nn.Sequential(nn.Conv1d(64, 64, 1,1,0),  nn.GroupNorm(8, 64), nn.ReLU(inplace=True))
-            self.conv_block4 = nn.Sequential(nn.Conv1d(64, 256, 1,1,0),  nn.GroupNorm(8, 256), nn.ReLU(inplace=True))
-            self.conv_block5 = nn.Sequential(nn.Conv1d(256, 1024, 1,1,0),  nn.GroupNorm(8, 1024), nn.ReLU(inplace=True))
-        else:
-            self.conv_block1 = nn.Sequential(nn.Conv1d(in_dim, 64, 1,1,0),  nn.BatchNorm1d(64), nn.ReLU(inplace=True))
-            self.conv_block2 = nn.Sequential(nn.Conv1d(64, 64, 1,1,0),  nn.BatchNorm1d(64), nn.ReLU(inplace=True))
-            self.conv_block3 = nn.Sequential(nn.Conv1d(64, 64, 1,1,0),  nn.BatchNorm1d(64), nn.ReLU(inplace=True))
-            self.conv_block4 = nn.Sequential(nn.Conv1d(64, 256, 1,1,0),  nn.BatchNorm1d(256), nn.ReLU(inplace=True))
-            self.conv_block5 = nn.Sequential(nn.Conv1d(256, 1024, 1,1,0),  nn.BatchNorm1d(1024), nn.ReLU(inplace=True))
-    def forward(self, x, pooling=True):
-        point1_feat64 = self.conv_block1(x)
-        point2_feat64 = self.conv_block2(point1_feat64)
-        point3_feat64 = self.conv_block3(point2_feat64)
-        x = self.conv_block4(point3_feat64)
-        point_feat1024 = self.conv_block5(x)
-        L = torch.cat([point1_feat64,point2_feat64,point3_feat64,point_feat1024], dim = 1)
-        if not pooling:
-            return L
-        x, _ = torch.max(L, dim=2)
-        return L , x
-
-
-   
+ 
 class PointNet_de(nn.Module):
     def __init__(self, in_dim, gn, out_dims):
         super(PointNet_de, self).__init__()
@@ -268,11 +262,6 @@ class PointNet_de(nn.Module):
         g, _ = torch.max(f, dim=2)
         return f, g
 
-
-
-
-
-
 class MLPs(nn.Module):
     def __init__(self, in_dim , gn , mlps):
         super(MLPs, self).__init__()
@@ -290,29 +279,21 @@ class MLPs(nn.Module):
         return x
     
 
-
-
-
-
-
 class InitModule(nn.Module):
     def __init__(self, in_dim, gn):
         super(InitModule, self).__init__()
 #        self.encoder = PointNet(in_dim=in_dim,
 #                                gn=gn,
 #                                out_dims=[64, 64, 64, 128, 1024])
-#        out_dims=[64, 64, 64, 128, 1024]
-        self.encoder1 = PointNet1(in_dim=in_dim,gn=gn)
+        self.encoder1 = Res_PointNet(in_dim=in_dim,gn=gn)
         
         self.decoder_ol = PointNet_de(in_dim=6080,
                                    gn=gn,
                                    out_dims=[2048,2048,512,256,2])
-#       [2048, 2048,512, 256, 2]
         self.decoder_qt = MLPs(in_dim=2432,
                                gn = gn,
                                mlps=[1024,1024,256,256,7])
         self.pointer = Transformer()
-#        [2048,2048,256,256,7]
 
     def forward(self, src, tgt):
         '''
@@ -339,7 +320,7 @@ class InitModule(nn.Module):
         # overlap prediction
         f_x1, g_x1 = self.encoder1(transformed_x.permute(0, 2, 1).contiguous())
         
-        ff_x , ff_y = self.pointer(f_x1,f_y)                   #1024
+        ff_x , ff_y = self.pointer(f_x1,f_y)                   #1024维度
         
  
         g_x_expand = torch.unsqueeze(g_x1, dim=-1).expand_as(f_x1)

@@ -49,7 +49,7 @@ def config_params():
 def train_config_params():
     parser = argparse.ArgumentParser(parents=[config_params()])
     parser.add_argument('--seed', type=int, default=1234)
-    parser.add_argument('--epoches', type=int, default=640)
+    parser.add_argument('--epoches', type=int, default=1240)
     parser.add_argument('--batchsize', type=int, default=8)
     parser.add_argument('--num_workers', type=int, default=4)
     parser.add_argument('--lr', type=float, default=0.0001,

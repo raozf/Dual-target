@@ -28,20 +28,6 @@ def Init_loss(gt_transformed_src, pred_transformed_src, loss_type='mae'):
     return losses
 
 
-def compute_loss(ref_cloud, pred_ref_clouds, loss_fn):
-    losses = []
-    discount_factor = 1
-    for i in range(2):
-        loss = loss_fn(ref_cloud[..., :3].contiguous(),
-                       pred_ref_clouds[i][..., :3].contiguous())
-        losses.append(discount_factor**(2 - i)*loss)
-    return torch.sum(torch.stack(losses))
-
-def compute_loss1(ref_cloud, pred_ref_clouds, loss_fn):
-    loss = loss_fn(ref_cloud[..., :3].contiguous(),
-                       pred_ref_clouds[0][..., :3].contiguous())
-        
-    return loss
 
 def Refine_loss(gt_transformed_src, pred_transformed_src, weights=None, loss_type='mae'):
     losses = {}
@@ -90,9 +76,8 @@ def cal_loss(gt_transformed_src, pred_transformed_src,gt_transformed_src_R, pred
                                    pred_transformed_src_R[1:],
                                    weights=None)
     
-    alpha, beta, gamma = 1, 0.12, 1
     if x_ol is not None:
-        losses['total'] = 1.2*losses['init1'] + 1.2*losses['init2']+ beta * losses['ol'] + 1.2*losses['refine1']
+        losses['total'] = 1.0*losses['init1'] + 1.0*losses['init2']+ 0.1 * losses['ol'] + 1.0*losses['refine1']
     else:
-        losses['total'] = 1.2*losses['init1'] + 1.2*losses['init2']+ 1.2*losses['refine1'] 
+        losses['total'] = 1.0*losses['init1'] + 1.0*losses['init2']+ 1.0*losses['refine1'] 
     return losses
