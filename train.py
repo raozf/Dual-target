@@ -65,7 +65,6 @@ def train_one_epoch(train_loader, model, loss_fn, optimizer, epoch, log_freq, wr
         gt_transformed_src_R = batch_transform(src_cloud[..., :3], inv_R)
 
         dists = square_dists(gt_transformed_src, tgt_cloud[..., :3])
-#        dist2 = square_dists()
         loss_all = loss_fn(gt_transformed_src=gt_transformed_src,
                            pred_transformed_src=pred_src,
                            gt_transformed_src_R=gt_transformed_src_R,
@@ -191,7 +190,6 @@ def main():
     train_set = ModelNet40(root=args.root,
                            split='train',
                            npts=args.npts,
-                           p_keep=args.p_keep,
                            noise=args.noise,
                            unseen=args.unseen,
                            ao=args.ao,
@@ -200,7 +198,6 @@ def main():
     val_set = ModelNet40(root=args.root,
                           split='test',
                           npts=args.npts,
-                          p_keep=args.p_keep,
                           noise=args.noise,
                           unseen=args.unseen,
                           ao=args.ao,

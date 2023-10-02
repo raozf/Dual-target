@@ -63,17 +63,17 @@ def Ol_loss(x_ol, y_ol, dists):
 def cal_loss(gt_transformed_src, pred_transformed_src,gt_transformed_src_R, pred_transformed_src_R, dists, x_ol, y_ol):
     losses = {}
     losses['init1'] = Init_loss(gt_transformed_src,
-                               pred_transformed_src[0:1])
+                               pred_transformed_src[0:1])      #pred_transformed_src[0] is the point cloud after init module
     losses['init2'] = Init_loss(gt_transformed_src_R,
-                               pred_transformed_src_R[0:1])
+                               pred_transformed_src_R[0:1])    #pred_transformed_src_R[0] is the point cloud after init module to newly added target point cloud
 
     if x_ol is not None:
         losses['ol'] = Ol_loss(x_ol, y_ol, dists)
     losses['refine1'] = Refine_loss(gt_transformed_src,
-                                   pred_transformed_src[1:],
+                                   pred_transformed_src[1:],   #pred_transformed_src[1:] is the final transformed point cloud 
                                    weights=None)
     losses['refine2'] = Refine_loss(gt_transformed_src_R,
-                                   pred_transformed_src_R[1:],
+                                   pred_transformed_src_R[1:], #pred_transformed_src_R[1:] is the final transformed point cloud, we do not use this loss function 
                                    weights=None)
     
     if x_ol is not None:

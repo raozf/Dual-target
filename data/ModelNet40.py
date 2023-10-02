@@ -28,21 +28,20 @@ half2_symmetric = ['tent', 'vase']
 
 
 class ModelNet40(Dataset):
-    def __init__(self, root, split, npts, p_keep, noise, unseen, ao=False,
+    def __init__(self, root, split, npts, noise, unseen, ao=False,
                  normal=False):
         super(ModelNet40, self).__init__()
         self.single = False # for specific-class visualization
         assert split in ['train', 'val', 'test']
         self.split = split
         self.npts = npts
-        self.p_keep = p_keep
         self.noise = noise
         self.unseen = unseen
-        self.ao = ao # Asymmetric Objects
+        self.ao = ao      # Asymmetric Objects
         self.normal = normal
         
-        self.half = half1 if split in 'train' else half2
-        self.symmetric = half1_symmetric + half2_symmetric
+        self.half = half1 if split in 'train' else half2                #unseen categories, half1 for training set and half2 for testing set. 
+        self.symmetric = half1_symmetric + half2_symmetric              #ao removing symmetric categories for testing set
         
         self.label2cat, self.cat2label = self.label2category(
             os.path.join(root, 'shape_names.txt'))
@@ -52,14 +51,14 @@ class ModelNet40(Dataset):
         
         files = [os.path.join(root, 'ply_data_train{}.h5'.format(i))
                  for i in range(5)]
-#         files = [os.path.join(root, 'ply_data_train{}.h5'.format(i))
-#                 for i in range(4)]
-#        if self.split == 'val':
-#            files = [os.path.join(root, 'ply_data_train{}.h5'.format(4))]     #Whether to use a validation set
         if self.split == 'test':
             files = [os.path.join(root, 'ply_data_test{}.h5'.format(i))
                      for i in range(2)]
-
+#         files = [os.path.join(root, 'ply_data_train{}.h5'.format(i))      #Whether to use a validation set
+#                 for i in range(4)]
+#        if self.split == 'val':
+#            files = [os.path.join(root, 'ply_data_train{}.h5'.format(4))]     
+        
         self.data, self.labels = self.decode_h5(files)
         print(f'split: {self.split}, unique_ids: {len(np.unique(self.labels))}')
 
@@ -90,7 +89,7 @@ class ModelNet40(Dataset):
                 cur_points = cur_points[idx]
                 cur_normal = cur_normal[idx]
                 cur_label = cur_label[idx]
-            if self.single:
+            if self.single:                                  # for specific-class visualization
                 idx = np.isin(cur_label, [8])
                 cur_points = cur_points[idx]
                 cur_normal = cur_normal[idx]
@@ -104,7 +103,7 @@ class ModelNet40(Dataset):
         label = np.concatenate(label, axis=0)
         return data, label
 
-    def compose(self, item, p_keep):
+    def compose(self, item):
         tgt_cloud = self.data[item, ...]
         keep0 = np.random.uniform(0.65, 0.75)                #random-parameter, just using in the testing process
         keep1 = np.random.uniform(0.65, 0.75)
@@ -116,7 +115,7 @@ class ModelNet40(Dataset):
             np.random.seed(item)
             R, t = generate_random_rotation_matrix(), generate_random_tranlation_vector()
         else:
-            tgt_cloud = flip_pc(tgt_cloud)
+            tgt_cloud = flip_pc(tgt_cloud)                   #avoiding overlapping
             R, t = generate_random_rotation_matrix(), generate_random_tranlation_vector()
 
         src_cloud = random_crop(copy.deepcopy(tgt_cloud), p_keep=keep0)  
@@ -134,9 +133,9 @@ class ModelNet40(Dataset):
         src_cloud_R_points = transform(src_cloud[:, :3], np.linalg.inv(R))
         src_cloud_R_normal = transform(src_cloud[:, 3:], np.linalg.inv(R))
         src_cloud_R = np.concatenate([src_cloud_R_points, src_cloud_R_normal],
-                                   axis=-1)                                    #The access to newly added target point cloud
-       
-        if self.split == 'train' or self.noise:
+                                   axis=-1)                                    #Justly explaining the access to newly added target point cloud
+        print(src_cloud)
+        if self.split == 'train' or self.noise:                                #The training set is added noise always.
             src_cloud[:, :3] = jitter_point_cloud(src_cloud[:, :3])
             src_cloud_R[:, :3] = jitter_point_cloud(src_cloud_R[:, :3])
             tgt_cloud[:, :3] = jitter_point_cloud(tgt_cloud[:, :3])
@@ -150,9 +149,10 @@ class ModelNet40(Dataset):
         if not self.normal:
             tgt_cloud, src_cloud,src_cloud_R, = tgt_cloud[:, :3], src_cloud[:, :3],src_cloud_R[:, :3]
             
+        #random points for the point cloud with less points, here we use the last points for random points, because the points are disordered.    
         x_size = src_cloud.shape[0]
         y_size = tgt_cloud.shape[0]
-        if x_size < y_size:
+        if x_size < y_size:     
             diff = y_size - x_size  
             src_cloud = np.concatenate((src_cloud , src_cloud[x_size-1-diff:x_size-1,:]), axis=0)
         if x_size > y_size:    

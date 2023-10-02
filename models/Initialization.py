@@ -284,7 +284,7 @@ class InitModule(nn.Module):
         super(InitModule, self).__init__()
 #        self.encoder = PointNet(in_dim=in_dim,
 #                                gn=gn,
-#                                out_dims=[64, 64, 64, 128, 1024])
+#                                out_dims=[64, 64, 64, 128, 1024])         #No residuals are used in the initialization module 
         self.encoder1 = Res_PointNet(in_dim=in_dim,gn=gn)
         
         self.decoder_ol = PointNet_de(in_dim=6080,
