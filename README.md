@@ -29,4 +29,4 @@ CUDA_VISIBLE_DEVICES=0 python vis.py --root your_data_path/modelnet40_ply_hdf5_2
 
 ## Acknowledgements
 
-We thank the authors of [RPMNet](https://github.com/yewzijian/RPMNet), [PCRNet](https://github.com/vinits5/pcrnet_pytorch),and [ROPNet](https://github.com/zhulf0804/ROPNet) for open sourcing their methods. Our model is based on ROPNet, and we have improved by 40%-52% on his basis.  If you are interesting in our method, you can read ROPNet before.   [Point Cloud Registration Using Representative Overlapping Points](https://arxiv.org/abs/2107.02583)# Dual-target
+We thank the authors of [RPMNet](https://github.com/yewzijian/RPMNet), [PCRNet](https://github.com/vinits5/pcrnet_pytorch),and [ROPNet](https://github.com/zhulf0804/ROPNet) for open sourcing their methods. Our model is based on ROPNet, and we have improved by 40%-52% on his basis.  If you are interesting in our method, you can read ROPNet before.   [Point Cloud Registration Using Representative Overlapping Points](https://arxiv.org/abs/2107.02583)
